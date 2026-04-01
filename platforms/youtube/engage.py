@@ -236,27 +236,43 @@ class YouTubeBot:
         """Comment on current video. Click comment area to open sheet."""
         self._reconnect()
 
-        # Comment area is between engagement row and next video
-        # Click at ~48% of screen height (below like buttons, above suggestions)
-        w, h = self.device.screen_size
-        comment_y = int(h * 0.48)
-        self.device.d.click(w // 2, comment_y)
-        random_sleep(2.0, 4.0)
+        # Try to find and click the comment section
+        # Method 1: Find "Comments" text area (most reliable)
+        for el in self.device.d.xpath('//*[contains(@text, "Comments")]').all():
+            try:
+                bounds = el.rect
+                # Click slightly below the "Comments N" text to open sheet
+                self.device.d.click(bounds[0] + bounds[2] // 2, bounds[1] + bounds[3] + 20)
+                random_sleep(2.0, 4.0)
+                break
+            except Exception:
+                pass
+        else:
+            # Method 2: Click at ~48% screen height (fallback)
+            w, h = self.device.screen_size
+            self.device.d.click(w // 2, int(h * 0.48))
+            random_sleep(2.0, 4.0)
+
         self._reconnect()
 
-        # Now in comment sheet — find input and type
+        # Check if comment sheet opened — look for EditText
         comment_input = self.device.d(className="android.widget.EditText")
         if not comment_input.exists(timeout=3):
-            logger.debug("Comment input not found in sheet")
+            logger.debug("Comment sheet didn't open")
             self.device.press_back()
             return False
 
-        comment_input.click()
-        random_sleep(0.5, 1.0)
-        comment_input.clear_text()
-        random_sleep(0.3, 0.5)
-        self.device.d.send_keys(comment_text)
-        random_sleep(0.5, 1.5)
+        try:
+            comment_input.click()
+            random_sleep(0.5, 1.0)
+            comment_input.clear_text()
+            random_sleep(0.3, 0.5)
+            self.device.d.send_keys(comment_text)
+            random_sleep(0.5, 1.5)
+        except Exception as e:
+            logger.warning(f"Comment input error: {e}")
+            self.device.press_back()
+            return False
 
         # Click "Send comment" button
         send_btn = self.device.d(description="Send comment")
