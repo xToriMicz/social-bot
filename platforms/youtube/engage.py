@@ -236,22 +236,18 @@ class YouTubeBot:
         """Comment on current video. Click comment area to open sheet."""
         self._reconnect()
 
-        # Try to find and click the comment section
-        # Method 1: Find "Comments" text area (most reliable)
-        for el in self.device.d.xpath('//*[contains(@text, "Comments")]').all():
-            try:
-                bounds = el.rect
-                # Click slightly below the "Comments N" text to open sheet
-                self.device.d.click(bounds[0] + bounds[2] // 2, bounds[1] + bounds[3] + 20)
-                random_sleep(2.0, 4.0)
-                break
-            except Exception:
-                pass
+        # Click comment area — located below the like/engagement row
+        # Find like button position and click ~120px below it
+        like_btn = self.device.d(descriptionContains="like this video")
+        if like_btn.exists(timeout=3):
+            bounds = like_btn.info["bounds"]
+            comment_y = bounds["bottom"] + 120
+            self.device.d.click(bounds["left"], comment_y)
         else:
-            # Method 2: Click at ~48% screen height (fallback)
+            # Fallback: click at ~44% screen height
             w, h = self.device.screen_size
-            self.device.d.click(w // 2, int(h * 0.48))
-            random_sleep(2.0, 4.0)
+            self.device.d.click(w // 2, int(h * 0.44))
+        random_sleep(2.0, 4.0)
 
         self._reconnect()
 
