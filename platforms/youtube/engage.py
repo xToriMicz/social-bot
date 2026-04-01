@@ -225,16 +225,14 @@ class YouTubeBot:
         return True
 
     def _try_comment(self, session: SessionState, comment_text: str) -> bool:
-        """Comment on current video. Click comment preview to open sheet."""
+        """Comment on current video. Click comment area to open sheet."""
         self._reconnect()
 
-        # Click comment preview (EditText with placeholder) to open comment sheet
-        comment_preview = self.device.d(className="android.widget.EditText")
-        if not comment_preview.exists(timeout=3):
-            logger.debug("Comment preview not found")
-            return False
-
-        comment_preview.click()
+        # Comment area is between engagement row and next video
+        # Click at ~48% of screen height (below like buttons, above suggestions)
+        w, h = self.device.screen_size
+        comment_y = int(h * 0.48)
+        self.device.d.click(w // 2, comment_y)
         random_sleep(2.0, 4.0)
         self._reconnect()
 
