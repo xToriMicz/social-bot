@@ -383,11 +383,11 @@ class YouTubeBot:
             close_btn.click()
             random_sleep(1.0, 2.0)
 
-        # Go to Shorts tab
+        # Go to Shorts tab — wait longer for content to load (not just skeleton)
         shorts_tab = self.device.d(description="Shorts")
         if shorts_tab.exists(timeout=3):
             self.device.click_element(shorts_tab)
-            random_sleep(3.0, 5.0)
+            random_sleep(8.0, 12.0)
 
         for i in range(shorts_count):
             if session.likes_limit_reached:
