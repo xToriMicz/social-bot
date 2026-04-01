@@ -1,63 +1,79 @@
-"""YouTube Android app UI selectors — resource IDs and content descriptions.
+"""YouTube Android app UI selectors — verified on emulator-5556.
 
 YouTube package: com.google.android.youtube
-These selectors target YouTube on Android 14 (API 34).
+Verified on: Pixel 8 AVD, API 34, YouTube latest (Apr 2026)
 Selectors may break when YouTube updates — verify with `d.dump_hierarchy()`.
 """
 
 # Package
 PACKAGE = "com.google.android.youtube"
-MAIN_ACTIVITY = "com.google.android.apps.youtube.app.watchwhile.WatchWhileActivity"
+HOME_ACTIVITY = ".HomeActivity"  # verified — not WatchWhileActivity
 
-# Navigation bar
+# Navigation bar (bottom)
 NAV_HOME = {"description": "Home"}
 NAV_SHORTS = {"description": "Shorts"}
-NAV_SUBSCRIPTIONS = {"description": "Subscriptions"}
-NAV_LIBRARY = {"description": "Library"}
+NAV_SUBSCRIPTIONS = {"descriptionContains": "Subscriptions"}  # may have ": New content is available" suffix
+NAV_YOU = {"description": "You"}
 
 # Toolbar
 SEARCH_BUTTON = {"description": "Search"}
-MORE_OPTIONS = {"description": "More options"}
+CAST_BUTTON = {"description": "Cast"}
+CREATE_BUTTON = {"description": "Create"}
+NOTIFICATIONS_BUTTON = {"description": "Notifications"}
 YOUTUBE_LOGO = {"resourceId": "com.google.android.youtube:id/youtube_logo"}
 
-# Feed
+# Feed (home/subscriptions)
 FEED_RESULTS = {"resourceId": "com.google.android.youtube:id/results"}
-VIDEO_TITLE = {"resourceId": "com.google.android.youtube:id/title"}
-VIDEO_THUMBNAIL = {"resourceId": "com.google.android.youtube:id/thumbnail"}
-VIDEO_BODY = {"resourceId": "com.google.android.youtube:id/body_text"}
+VIDEO_IN_FEED = {"descriptionContains": "play video"}  # verified — all feed videos end with "play video"
+VIDEO_THUMBNAIL = {"resourceId": "com.google.android.youtube:id/thumbnail_layout"}
+ACTION_MENU = {"description": "Action menu"}
 
-# Video player (when watching a video)
-LIKE_BUTTON = {"descriptionContains": "like this video"}
-LIKE_BUTTON_ALT = {"descriptionContains": "Like"}
-DISLIKE_BUTTON = {"descriptionContains": "Dislike"}
+# Mini player — YouTube opens videos in mini player by default
+MINI_PLAYER = {"description": "Expand Mini Player"}
+
+# Video player (full watch mode — after expanding mini player)
+LIKE_BUTTON = {"descriptionContains": "I like this"}  # verified — NOT "like this video"
+LIKE_BUTTON_ACTIVE = {"descriptionContains": "Remove like"}  # after liking
+DISLIKE_BUTTON = {"descriptionContains": "I dislike this"}
+VIDEO_PLAYER = {"description": "Video player"}
+PAUSE_BUTTON = {"description": "Pause video"}
+NEXT_BUTTON = {"description": "Next video"}
+PREVIOUS_BUTTON = {"description": "Previous video"}
+FULLSCREEN_BUTTON = {"description": "Enter fullscreen"}
+MINIMIZE_BUTTON = {"description": "Minimize"}
+CAPTIONS_BUTTON = {"description": "Captions"}
+AUTOPLAY_BUTTON = {"descriptionContains": "Autoplay"}
+CHANNEL_LINK = {"descriptionContains": "Go to channel"}
+
+# Engagement row (below player — need to scroll down)
 SHARE_BUTTON = {"descriptionContains": "Share"}
-COMMENT_BUTTON = {"descriptionContains": "Comments"}
 SUBSCRIBE_BUTTON = {"textContains": "Subscribe"}
 SUBSCRIBED_INDICATOR = {"textContains": "Subscribed"}
 
-# Comment section
+# Comment section (need to scroll down below engagement row)
+COMMENT_SECTION = {"textContains": "Comments"}
 COMMENT_INPUT = {"textContains": "Add a comment"}
-COMMENT_INPUT_ALT = {"resourceId": "com.google.android.youtube:id/comment_create_edit_text"}
+COMMENT_INPUT_ALT = {"descriptionContains": "Add a comment"}
 COMMENT_SEND_BUTTON = {"descriptionContains": "Send"}
-COMMENT_SEND_ALT = {"resourceId": "com.google.android.youtube:id/send_button"}
 COMMENT_SORT = {"descriptionContains": "Sort comments"}
 
 # Login
 SIGN_IN_BUTTON = {"textContains": "Sign in"}
 ACCOUNT_BUTTON = {"descriptionContains": "Account"}
-ACCOUNT_AVATAR = {"descriptionContains": "Go to your channel"}
 
-# Shorts player
-SHORTS_LIKE = {"descriptionContains": "Like"}
-SHORTS_COMMENT = {"descriptionContains": "Comment"}
-SHORTS_SHARE = {"descriptionContains": "Share"}
+# Subscriptions page
+SUBS_FILTER_ALL = {"description": "All Selected"}
+SUBS_FILTER_ALL_ALT = {"text": "All"}
+SUBS_TODAY = {"text": "Today"}
+SUBS_VIDEOS = {"text": "Videos"}
 
-# Dialogs / popups
+# Dialogs / popups (verified on first launch)
 POPUP_ALLOW = {"text": "Allow"}
+POPUP_DISMISS = {"text": "Dismiss"}
 POPUP_NOT_NOW = {"textContains": "Not now"}
+POPUP_NO_THANKS = {"textContains": "No thanks"}
 POPUP_SKIP = {"textContains": "Skip"}
 POPUP_OK = {"text": "OK"}
 POPUP_AGREE = {"textContains": "I agree"}
-POPUP_NO_THANKS = {"textContains": "No thanks"}
-POPUP_UPDATE = {"textContains": "Update"}
 POPUP_GOT_IT = {"textContains": "Got it"}
+POPUP_CONTINUE = {"text": "Continue"}

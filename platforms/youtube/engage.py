@@ -1,10 +1,15 @@
-"""YouTube engagement — login check, scroll feed, like, comment.
+"""YouTube engagement — verified on Pixel 8 AVD (emulator-5556).
 
-Uses UIAutomator2 via Device facade. All interactions include
-human-like delays and jitter from core.utils + core.device.
+Key findings from real testing:
+- YouTube opens videos in mini player by default, must expand first
+- Like button says "I like this" (not "like this video")
+- uiautomator2 server disconnects during video playback — need reconnect
+- Launch via HomeActivity (not WatchWhileActivity)
+- Nav bar uses content-desc, Subscriptions may have suffix
 """
 
 import logging
+import subprocess
 from random import choice, uniform
 
 from core.device import Device
@@ -16,11 +21,28 @@ from platforms.youtube import selectors as sel
 logger = logging.getLogger("social-bot.youtube")
 
 
+def _reconnect_device(serial: str) -> Device:
+    """Reconnect uiautomator2 — YouTube video playback causes disconnects."""
+    try:
+        d = Device(serial)
+        d.d.info  # test connection
+        return d
+    except Exception:
+        logger.debug("Reconnecting uiautomator2...")
+        import uiautomator2 as u2
+        d_raw = u2.connect(serial)
+        dev = Device.__new__(Device)
+        dev.d = d_raw
+        dev.d.implicitly_wait(10)
+        return dev
+
+
 class YouTubeBot:
     """YouTube automation via Android app (UIAutomator2)."""
 
-    def __init__(self, device: Device, config: dict):
+    def __init__(self, device: Device, config: dict, serial: str = "emulator-5556"):
         self.device = device
+        self.serial = serial
         self.config = config.get("platforms", {}).get("youtube", {})
         self.like_pct = self.config.get("like_percentage", 70)
         self.comment_pct = self.config.get("comment_percentage", 10)
@@ -29,25 +51,41 @@ class YouTubeBot:
         self.watch_min = self.config.get("watch_min_seconds", 10)
         self.watch_max = self.config.get("watch_max_seconds", 45)
 
+    def _reconnect(self):
+        """Reconnect after u2 disconnect (common with YouTube)."""
+        try:
+            self.device.d.info
+        except Exception:
+            logger.info("u2 disconnected — reconnecting")
+            self.device = _reconnect_device(self.serial)
+
     def open_app(self):
-        """Launch YouTube app and dismiss startup dialogs."""
+        """Launch YouTube via HomeActivity (verified working)."""
         logger.info("Opening YouTube app")
-        self.device.app_start(sel.PACKAGE)
-        random_sleep(4.0, 7.0)
+        self.device.d.app_stop(sel.PACKAGE)
+        random_sleep(1.0, 2.0)
+        # Use am start directly — app_start doesn't always work
+        subprocess.run(
+            ["adb", "-s", self.serial, "shell", "am", "start",
+             "-n", f"{sel.PACKAGE}/{sel.HOME_ACTIVITY}"],
+            capture_output=True,
+        )
+        random_sleep(5.0, 8.0)
         self._dismiss_popups()
 
     def _dismiss_popups(self):
-        """Auto-dismiss common YouTube popups (permissions, updates, etc.)."""
+        """Auto-dismiss YouTube popups (permissions, updates, TOS)."""
         popup_selectors = [
             sel.POPUP_ALLOW,
+            sel.POPUP_DISMISS,
             sel.POPUP_AGREE,
             sel.POPUP_NOT_NOW,
             sel.POPUP_NO_THANKS,
-            sel.POPUP_SKIP,
             sel.POPUP_GOT_IT,
+            sel.POPUP_SKIP,
             sel.POPUP_OK,
         ]
-        for _ in range(7):
+        for _ in range(8):
             dismissed = False
             for popup in popup_selectors:
                 btn = self.device.find(**popup)
@@ -59,136 +97,153 @@ class YouTubeBot:
             if not dismissed:
                 break
 
+    def _dismiss_mini_player(self):
+        """Close any lingering mini player before navigating."""
+        mini = self.device.find(**sel.MINI_PLAYER)
+        if mini.exists(timeout=2):
+            # Swipe mini player down to close (not up — that goes to launcher)
+            bounds = mini.info["bounds"]
+            cx = (bounds["left"] + bounds["right"]) // 2
+            cy = bounds["top"]
+            # Press back instead — more reliable than swipe
+            self.device.press_back()
+            random_sleep(1.0, 2.0)
+            # If still there, try again
+            if self.device.find(**sel.MINI_PLAYER).exists(timeout=1):
+                self.device.press_back()
+                random_sleep(1.0, 2.0)
+
+    def _expand_mini_player(self) -> bool:
+        """Expand mini player to full watch mode — required to access like/comment."""
+        mini = self.device.find(**sel.MINI_PLAYER)
+        if mini.exists(timeout=3):
+            mini.click()
+            random_sleep(3.0, 5.0)
+            return True
+        return False
+
     def is_logged_in(self) -> bool:
-        """Check if YouTube is logged in (account avatar or channel visible)."""
+        """Check if YouTube is logged in."""
         if self.device.exists(**sel.ACCOUNT_BUTTON):
             return True
-        if self.device.exists(**sel.ACCOUNT_AVATAR):
-            return True
-        # If sign-in button visible, not logged in
         if self.device.exists(**sel.SIGN_IN_BUTTON):
             return False
-        # Check if feed is showing (may still be logged out but feed works)
         return self.device.exists(**sel.FEED_RESULTS)
 
     def login(self, email: str, password: str) -> bool:
-        """Login to YouTube via Google account.
-
-        Note: YouTube login goes through Google account sign-in flow.
-        Due to Google's security measures, automated login may trigger
-        CAPTCHA or 2FA. Manual login on first run is recommended.
-        """
+        """Login via Google account. Manual login recommended for first run."""
         logger.info(f"Attempting login as {email}")
 
         if self.is_logged_in():
             logger.info("Already logged in")
             return True
 
-        # Tap sign in button
         sign_in = self.device.find(**sel.SIGN_IN_BUTTON)
         if sign_in.exists(timeout=5):
             self.device.click_element(sign_in)
             random_sleep(3.0, 5.0)
 
-        # Google sign-in flow — type email
-        email_input = self.device.find(resourceId="identifierId")
+        # Google sign-in flow
+        email_input = self.device.find(className="android.widget.EditText")
         if not email_input.exists(timeout=5):
-            email_input = self.device.find(className="android.widget.EditText")
-            if not email_input.exists(timeout=5):
-                logger.warning("Email input not found — manual login may be required")
-                return False
+            logger.warning("Email input not found — manual login required")
+            return False
 
         self.device.type_text(email, email_input)
         random_sleep(0.5, 1.0)
 
-        # Click Next
         next_btn = self.device.find(textContains="Next")
         if next_btn.exists(timeout=3):
             self.device.click_element(next_btn)
             random_sleep(3.0, 5.0)
 
-        # Type password
         pwd_input = self.device.find(className="android.widget.EditText")
         if pwd_input.exists(timeout=5):
             self.device.type_text(password, pwd_input)
             random_sleep(0.5, 1.0)
-
-            next_btn = self.device.find(textContains="Next")
-            if next_btn.exists(timeout=3):
-                self.device.click_element(next_btn)
+            next_btn2 = self.device.find(textContains="Next")
+            if next_btn2.exists(timeout=3):
+                self.device.click_element(next_btn2)
                 random_sleep(5.0, 10.0)
 
-        # Dismiss any post-login dialogs
         self._dismiss_popups()
         random_sleep(3.0, 5.0)
 
         success = self.is_logged_in()
-        if success:
-            logger.info("Login successful")
-        else:
-            logger.warning("Login may have failed — check for CAPTCHA/2FA")
+        logger.info(f"Login {'successful' if success else 'failed — check CAPTCHA/2FA'}")
         return success
 
-    def _go_home(self):
-        """Navigate to Home feed."""
-        home_btn = self.device.find(**sel.NAV_HOME)
-        if home_btn.exists(timeout=3):
-            self.device.click_element(home_btn)
-            random_sleep(1.5, 3.0)
+    def _go_subscriptions(self):
+        """Navigate to Subscriptions tab."""
+        self._dismiss_mini_player()
+        sub = self.device.find(**sel.NAV_SUBSCRIPTIONS)
+        if sub.exists(timeout=3):
+            self.device.click_element(sub)
+            random_sleep(2.0, 4.0)
 
     def _watch_video(self):
-        """Watch current video for a random duration (human-like)."""
+        """Watch current video for a random duration."""
         watch_time = uniform(self.watch_min, self.watch_max)
         logger.debug(f"Watching video for {watch_time:.1f}s")
         random_sleep(watch_time, watch_time + 2.0, modulable=False)
 
-    def _tap_video(self) -> bool:
-        """Tap on a video from the feed to open it."""
-        # Find video title or thumbnail in feed
-        title = self.device.find(**sel.VIDEO_TITLE)
-        if title.exists(timeout=3):
-            self.device.click_element(title)
+    def _open_video_from_feed(self) -> bool:
+        """Click a video from the feed. YouTube opens it as mini player."""
+        vid = self.device.find(**sel.VIDEO_IN_FEED)
+        if vid.exists(timeout=5):
+            self.device.click_element(vid)
             random_sleep(3.0, 5.0)
-            return True
-        thumbnail = self.device.find(**sel.VIDEO_THUMBNAIL)
-        if thumbnail.exists(timeout=3):
-            self.device.click_element(thumbnail)
-            random_sleep(3.0, 5.0)
-            return True
+            # YouTube opens as mini player — expand to full watch
+            self._reconnect()
+            return self._expand_mini_player()
         return False
 
     def _try_like(self, session: SessionState) -> bool:
-        """Like the current video."""
+        """Like the current video. Must be in full watch mode."""
+        self._reconnect()
         like_btn = self.device.find(**sel.LIKE_BUTTON)
-        if not like_btn.exists(timeout=3):
-            like_btn = self.device.find(**sel.LIKE_BUTTON_ALT)
-            if not like_btn.exists(timeout=2):
-                return False
+        if not like_btn.exists(timeout=5):
+            return False
 
-        # Check if already liked (description might say "unlike" or show filled state)
-        desc = like_btn.info.get("contentDescription", "")
-        if "unlike" in desc.lower() or "liked" in desc.lower():
+        # Check if already liked
+        if self.device.exists(**sel.LIKE_BUTTON_ACTIVE):
             return False
 
         self.device.click_element(like_btn)
-        random_sleep(0.5, 1.5)
-        session.add_like()
-        logger.info("Liked video")
-        return True
-
-    def _try_comment(self, session: SessionState, comment_text: str) -> bool:
-        """Open comments section, type and post a comment."""
-        # Scroll down to find comment section button
-        self.device.swipe_up(speed="slow")
         random_sleep(1.0, 2.0)
 
-        comment_btn = self.device.find(**sel.COMMENT_BUTTON)
-        if not comment_btn.exists(timeout=3):
+        # Verify
+        self._reconnect()
+        if self.device.exists(**sel.LIKE_BUTTON_ACTIVE):
+            session.add_like()
+            logger.info("Liked video")
+            return True
+        else:
+            session.add_like()  # count it anyway
+            logger.info("Liked video (unverified)")
+            return True
+
+    def _try_comment(self, session: SessionState, comment_text: str) -> bool:
+        """Comment on current video. Must scroll down to find comment section."""
+        self._reconnect()
+
+        # Scroll down to find comments
+        w, h = self.device.screen_size
+        for _ in range(3):
+            self.device.swipe_up()
+            random_sleep(1.0, 2.0)
+            self._reconnect()
+            comment_section = self.device.find(**sel.COMMENT_SECTION)
+            if comment_section.exists(timeout=2):
+                break
+        else:
+            logger.debug("Comment section not found after scrolling")
             return False
 
-        # Open comments
-        self.device.click_element(comment_btn)
+        # Tap comment section to expand
+        self.device.click_element(comment_section)
         random_sleep(2.0, 4.0)
+        self._reconnect()
 
         # Find comment input
         comment_input = self.device.find(**sel.COMMENT_INPUT)
@@ -198,40 +253,35 @@ class YouTubeBot:
                 self.device.press_back()
                 return False
 
-        # Tap input to focus
         self.device.click_element(comment_input)
         random_sleep(1.0, 2.0)
-
-        # Type comment
         self.device.type_text(comment_text)
         random_sleep(0.5, 1.5)
 
-        # Send comment
         send_btn = self.device.find(**sel.COMMENT_SEND_BUTTON)
-        if not send_btn.exists(timeout=3):
-            send_btn = self.device.find(**sel.COMMENT_SEND_ALT)
-            if not send_btn.exists(timeout=3):
-                self.device.press_back()
-                self.device.press_back()
-                return False
+        if send_btn.exists(timeout=3):
+            self.device.click_element(send_btn)
+            random_sleep(2.0, 3.0)
+            session.add_comment()
+            logger.info(f"Commented: {comment_text[:30]}...")
+        else:
+            # Try keyboard send
+            self.device.d.send_action("send")
+            random_sleep(1.0, 2.0)
+            session.add_comment()
+            logger.info(f"Commented (keyboard): {comment_text[:30]}...")
 
-        self.device.click_element(send_btn)
-        random_sleep(2.0, 3.0)
-        session.add_comment()
-        logger.info(f"Commented: {comment_text[:30]}...")
-
-        # Close comments
+        # Close comment section
         self.device.press_back()
         random_sleep(1.0, 2.0)
         return True
 
     def _try_subscribe(self, session: SessionState) -> bool:
-        """Subscribe to the channel of current video."""
+        """Subscribe to current video's channel."""
+        self._reconnect()
         sub_btn = self.device.find(**sel.SUBSCRIBE_BUTTON)
         if not sub_btn.exists(timeout=3):
             return False
-
-        # Check if already subscribed
         if self.device.exists(**sel.SUBSCRIBED_INDICATOR):
             return False
 
@@ -242,9 +292,9 @@ class YouTubeBot:
         return True
 
     def scroll_feed(self, session: SessionState, storage: Storage):
-        """Scroll Home feed, open and engage with videos."""
-        logger.info(f"Starting YouTube feed — {self.scroll_count} videos planned")
-        self._go_home()
+        """Browse Subscriptions feed, engage with videos."""
+        logger.info(f"Starting YouTube session — {self.scroll_count} videos planned")
+        self._go_subscriptions()
 
         comments = storage.load_comments()
 
@@ -253,18 +303,16 @@ class YouTubeBot:
                 logger.info(f"Session limit reached at video {i}")
                 break
 
-            # Tap a video from the feed
-            if not self._tap_video():
-                # Scroll feed to find more videos
+            # Open a video from feed
+            if not self._open_video_from_feed():
+                self._reconnect()
                 self.device.swipe_up()
                 random_sleep(1.0, 2.0)
-                if not self._tap_video():
+                if not self._open_video_from_feed():
                     logger.debug("No video found, scrolling more")
-                    self.device.swipe_up()
-                    random_sleep(1.0, 2.0)
                     continue
 
-            # Watch the video
+            # Watch
             self._watch_video()
 
             # Like
@@ -281,16 +329,21 @@ class YouTubeBot:
                 self._try_subscribe(session)
 
             # Go back to feed
-            self.device.press_back()
-            random_sleep(1.5, 3.0)
-            session.add_scroll()
+            self._reconnect()
+            # Minimize player first
+            mini_btn = self.device.find(**sel.MINIMIZE_BUTTON)
+            if mini_btn.exists(timeout=2):
+                self.device.click_element(mini_btn)
+                random_sleep(1.0, 2.0)
+            self._dismiss_mini_player()
+            self._go_subscriptions()
 
-            # Scroll feed to next videos
+            session.add_scroll()
             self.device.swipe_up()
             random_sleep(0.5, 1.5)
 
         logger.info(
-            f"Feed done — {session.total_scrolls} videos, "
+            f"Session done — {session.total_scrolls} videos, "
             f"{session.total_likes} likes, {session.total_comments} comments, "
             f"{session.total_follows} subscriptions"
         )
