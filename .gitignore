@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+accounts/*/credentials.json
+accounts/*/facebook/credentials.json
+accounts/*/youtube/credentials.json
+accounts/*/tiktok/credentials.json
+*.png
+.env
