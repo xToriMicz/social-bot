@@ -371,8 +371,52 @@ class YouTubeBot:
             f"{session.total_follows} subscriptions"
         )
 
+    def scroll_shorts(self, session: SessionState):
+        """Scroll Shorts feed — like every Short, no comment needed."""
+        shorts_count = self.config.get("shorts_count", 20)
+        logger.info(f"Starting Shorts session — {shorts_count} shorts planned")
+
+        # Go to Shorts tab
+        shorts_tab = self.device.d(description="Shorts")
+        if shorts_tab.exists(timeout=3):
+            self.device.click_element(shorts_tab)
+            random_sleep(3.0, 5.0)
+
+        for i in range(shorts_count):
+            if session.likes_limit_reached:
+                logger.info(f"Like limit reached at short {i}")
+                break
+
+            self._reconnect()
+
+            # Watch for a bit (shorter than regular videos)
+            watch_time = uniform(3.0, 8.0)
+            random_sleep(watch_time, watch_time + 1.0, modulable=False)
+
+            # Like
+            if chance(self.like_pct):
+                try:
+                    like_btn = self.device.d(descriptionContains="like this video")
+                    if like_btn.exists(timeout=3):
+                        like_btn.click()
+                        random_sleep(0.5, 1.5)
+                        session.add_like()
+                        logger.info(f"Liked short {i + 1}")
+                except Exception as e:
+                    logger.debug(f"Like failed: {e}")
+
+            # Swipe to next Short
+            self.device.swipe_up()
+            session.add_scroll()
+            random_sleep(0.5, 1.5)
+
+        logger.info(
+            f"Shorts done — {session.total_scrolls} shorts, "
+            f"{session.total_likes} likes"
+        )
+
     def run(self, session: SessionState, storage: Storage, credentials: dict) -> bool:
-        """Full YouTube engagement session."""
+        """Full YouTube engagement session: Subscriptions feed + Shorts."""
         session.platform = "youtube"
 
         self.open_app()
@@ -380,13 +424,16 @@ class YouTubeBot:
         if not self.is_logged_in():
             email = credentials.get("email", "")
             password = credentials.get("password", "")
-            if not email or not password:
-                logger.error("No credentials provided")
-                return False
-            if not self.login(email, password):
-                return False
+            if email and password:
+                self.login(email, password)
+            else:
+                logger.info("No credentials — browsing without login")
 
+        # Phase 1: Subscriptions feed (like + comment)
         self.scroll_feed(session, storage)
+
+        # Phase 2: Shorts (like only, all channels)
+        self.scroll_shorts(session)
 
         session.finish()
         storage.save_session(session.to_dict())

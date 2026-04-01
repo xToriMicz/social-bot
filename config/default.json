@@ -34,7 +34,8 @@
       "comment_percentage": 50,
       "subscribe_percentage": 10,
       "watch_min_seconds": 10,
-      "watch_max_seconds": 60
+      "watch_max_seconds": 60,
+      "shorts_count": 20
     },
     "tiktok": {
       "enabled": false,
