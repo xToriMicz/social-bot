@@ -192,7 +192,7 @@ class YouTubeBot:
         """Click an unseen video from the feed."""
         self._reconnect()
         try:
-            vids = self.device.d(descriptionMatches=r".*\d+ minutes?.*seconds?.*")
+            vids = self.device.d(**sel.VIDEO_IN_FEED)
             for v in vids:
                 try:
                     desc = v.info.get("contentDescription", "")
