@@ -376,6 +376,13 @@ class YouTubeBot:
         shorts_count = self.config.get("shorts_count", 20)
         logger.info(f"Starting Shorts session — {shorts_count} shorts planned")
 
+        # Close mini player first — it blocks the nav bar
+        self._dismiss_mini_player()
+        close_btn = self.device.d(description="Close minimized player")
+        if close_btn.exists(timeout=2):
+            close_btn.click()
+            random_sleep(1.0, 2.0)
+
         # Go to Shorts tab
         shorts_tab = self.device.d(description="Shorts")
         if shorts_tab.exists(timeout=3):
