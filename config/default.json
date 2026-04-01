@@ -41,7 +41,10 @@
       "like_percentage": 80,
       "comment_percentage": 10,
       "follow_percentage": 15,
-      "scroll_count": 20
+      "share_percentage": 5,
+      "scroll_count": 20,
+      "watch_min_seconds": 3,
+      "watch_max_seconds": 15
     }
   }
 }
