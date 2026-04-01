@@ -221,11 +221,18 @@ class YouTubeBot:
         """Like the current video. Must be in full watch mode."""
         self._reconnect()
         like_btn = self.device.find(**sel.LIKE_BUTTON)
-        if not like_btn.exists(timeout=5):
-            return False
+        if not like_btn.exists(timeout=3):
+            # Fallback: scroll down slightly — like row may be below player
+            logger.debug("Like not visible — scrolling down to find it")
+            w, h = self.device.screen_size
+            self.device.d.swipe(w // 2, int(h * 0.6), w // 2, int(h * 0.4), duration=0.3)
+            random_sleep(1.5, 2.5)
+            self._reconnect()
+            like_btn = self.device.find(**sel.LIKE_BUTTON)
+            if not like_btn.exists(timeout=3):
+                logger.debug("Like button not found after scroll")
+                return False
 
-        # YouTube doesn't change description after liking — can't verify via "Remove like"
-        # Just click and count it
         self.device.click_element(like_btn)
         random_sleep(1.0, 2.0)
         session.add_like()
@@ -371,16 +378,43 @@ class YouTubeBot:
             f"{session.total_follows} subscriptions"
         )
 
+    def _enter_shorts_fullscreen(self) -> bool:
+        """If Shorts opened as grid (some YT versions), click first thumbnail to enter fullscreen."""
+        self._reconnect()
+        like_btn = self.device.d(descriptionContains="like this video")
+        if like_btn.exists(timeout=2):
+            return True  # Already in fullscreen Shorts player
+
+        # Grid view — find and click first Short thumbnail
+        logger.debug("Shorts grid view detected — clicking first thumbnail")
+        # Shorts thumbnails are usually ImageViews or have "views" in description
+        thumb = self.device.d(descriptionMatches=r".*\d+ views.*")
+        if thumb.exists(timeout=3):
+            thumb.click()
+            random_sleep(3.0, 5.0)
+            self._reconnect()
+            return True
+
+        # Fallback: click center of screen (first visible Short)
+        w, h = self.device.screen_size
+        self.device.d.click(w // 4, int(h * 0.4))
+        random_sleep(3.0, 5.0)
+        self._reconnect()
+        return True
+
     def scroll_shorts(self, session: SessionState):
         """Scroll Shorts feed — like every Short, no comment needed."""
         shorts_count = self.config.get("shorts_count", 20)
         logger.info(f"Starting Shorts session — {shorts_count} shorts planned")
 
-        # Go to Shorts tab
+        # Go to Shorts tab (bottom nav — NOT Subscriptions filter)
         shorts_tab = self.device.d(description="Shorts")
         if shorts_tab.exists(timeout=3):
             self.device.click_element(shorts_tab)
             random_sleep(3.0, 5.0)
+
+        # Enter fullscreen player if grid view
+        self._enter_shorts_fullscreen()
 
         for i in range(shorts_count):
             if session.likes_limit_reached:
