@@ -21,7 +21,7 @@
   },
   "platforms": {
     "facebook": {
-      "enabled": true,
+      "enabled": false,
       "like_percentage": 70,
       "comment_percentage": 20,
       "share_percentage": 5,
@@ -29,9 +29,9 @@
       "comments_file": "accounts/{username}/comments.txt"
     },
     "youtube": {
-      "enabled": false,
-      "like_percentage": 60,
-      "comment_percentage": 15,
+      "enabled": true,
+      "like_percentage": 80,
+      "comment_percentage": 50,
       "subscribe_percentage": 10,
       "watch_min_seconds": 10,
       "watch_max_seconds": 60

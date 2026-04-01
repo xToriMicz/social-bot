@@ -1,0 +1,67 @@
+[
+  {
+    "id": "25bc6986-9430-4a2a-836d-d59b49fcbbf9",
+    "platform": "youtube",
+    "start_time": "2026-04-01 16:06:53.970326",
+    "finish_time": "2026-04-01 16:12:03.903953",
+    "total_likes": 0,
+    "total_comments": 0,
+    "total_follows": 0,
+    "total_scrolls": 1,
+    "total_shares": 0,
+    "total_watches": 0,
+    "errors": 0
+  },
+  {
+    "id": "746f42bf-7727-44bf-b0f0-ea87881f87e9",
+    "platform": "youtube",
+    "start_time": "2026-04-01 16:34:53.971909",
+    "finish_time": "2026-04-01 16:45:14.867977",
+    "total_likes": 4,
+    "total_comments": 0,
+    "total_follows": 0,
+    "total_scrolls": 8,
+    "total_shares": 0,
+    "total_watches": 0,
+    "errors": 0
+  },
+  {
+    "id": "23001f46-439c-4a52-8d68-493c5dd2d6d1",
+    "platform": "youtube",
+    "start_time": "2026-04-01 16:54:49.433957",
+    "finish_time": "2026-04-01 17:04:53.230973",
+    "total_likes": 8,
+    "total_comments": 0,
+    "total_follows": 0,
+    "total_scrolls": 8,
+    "total_shares": 0,
+    "total_watches": 0,
+    "errors": 0
+  },
+  {
+    "id": "af3e4acf-7235-42c4-aa89-689632afd5c7",
+    "platform": "youtube",
+    "start_time": "2026-04-01 17:18:51.735538",
+    "finish_time": "2026-04-01 17:21:59.635958",
+    "total_likes": 1,
+    "total_comments": 0,
+    "total_follows": 0,
+    "total_scrolls": 1,
+    "total_shares": 0,
+    "total_watches": 0,
+    "errors": 0
+  },
+  {
+    "id": "4e5ab8aa-d273-4730-9487-fab1c94280bb",
+    "platform": "youtube",
+    "start_time": "2026-04-01 17:24:43.569932",
+    "finish_time": "2026-04-01 17:27:44.640808",
+    "total_likes": 1,
+    "total_comments": 0,
+    "total_follows": 0,
+    "total_scrolls": 1,
+    "total_shares": 0,
+    "total_watches": 0,
+    "errors": 0
+  }
+]

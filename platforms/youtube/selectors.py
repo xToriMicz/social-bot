@@ -24,7 +24,7 @@ YOUTUBE_LOGO = {"resourceId": "com.google.android.youtube:id/youtube_logo"}
 
 # Feed (home/subscriptions)
 FEED_RESULTS = {"resourceId": "com.google.android.youtube:id/results"}
-VIDEO_IN_FEED = {"descriptionMatches": ".*\\d+ minutes?.*seconds?.*"}  # videos show duration in desc
+VIDEO_IN_FEED = {"descriptionMatches": ".+ - \\d+ minutes?, \\d+ seconds?.*"}  # "title - N minutes, N seconds"
 VIDEO_THUMBNAIL = {"resourceId": "com.google.android.youtube:id/thumbnail_layout"}
 ACTION_MENU = {"description": "Action menu"}
 
