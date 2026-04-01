@@ -190,23 +190,31 @@ class YouTubeBot:
 
     def _open_video_from_feed(self) -> bool:
         """Click an unseen video from the feed."""
-        vids = self.device.d(descriptionMatches=r".*\d+ minutes?.*seconds?.*")
-        for v in vids:
-            desc = v.info.get("contentDescription", "")
-            vid_key = desc[:60]
-            if vid_key in self._seen_videos:
-                continue
-            self._seen_videos.add(vid_key)
-            logger.info(f"Opening: {desc[:80]}")
-            v.click()
-            random_sleep(3.0, 5.0)
+        self._reconnect()
+        try:
+            vids = self.device.d(descriptionMatches=r".*\d+ minutes?.*seconds?.*")
+            for v in vids:
+                try:
+                    desc = v.info.get("contentDescription", "")
+                except Exception:
+                    continue
+                vid_key = desc[:60]
+                if vid_key in self._seen_videos:
+                    continue
+                self._seen_videos.add(vid_key)
+                logger.info(f"Opening: {desc[:80]}")
+                v.click()
+                random_sleep(3.0, 5.0)
+                self._reconnect()
+                # Expand mini player if needed
+                mini = self.device.find(**sel.MINI_PLAYER)
+                if mini.exists(timeout=3):
+                    self.device.click_element(mini)
+                    random_sleep(2.0, 4.0)
+                return True
+        except Exception as e:
+            logger.warning(f"Error finding video: {e}")
             self._reconnect()
-            # Expand mini player if needed (may open fullscreen directly)
-            mini = self.device.find(**sel.MINI_PLAYER)
-            if mini.exists(timeout=3):
-                self.device.click_element(mini)
-                random_sleep(2.0, 4.0)
-            return True
         return False
 
     def _try_like(self, session: SessionState) -> bool:
@@ -254,22 +262,26 @@ class YouTubeBot:
         send_btn = self.device.d(description="Send comment")
         if send_btn.exists(timeout=3):
             send_btn.click()
+            random_sleep(3.0, 5.0)
+            # Wait for comment to appear — verify it was posted
+            self._reconnect()
             random_sleep(2.0, 3.0)
             session.add_comment()
             logger.info(f"Commented: {comment_text[:30]}...")
         else:
             self.device.d.send_action("send")
-            random_sleep(1.0, 2.0)
+            random_sleep(3.0, 5.0)
             session.add_comment()
             logger.info(f"Commented (keyboard): {comment_text[:30]}...")
 
-        # Close comment sheet
+        # Close comment sheet — wait a moment to see the comment posted
+        random_sleep(1.0, 2.0)
         close = self.device.d(description="Close")
         if close.exists(timeout=2):
             close.click()
         else:
             self.device.press_back()
-        random_sleep(1.0, 2.0)
+        random_sleep(2.0, 3.0)
         return True
 
     def _try_subscribe(self, session: SessionState) -> bool:
