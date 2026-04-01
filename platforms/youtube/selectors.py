@@ -24,7 +24,7 @@ YOUTUBE_LOGO = {"resourceId": "com.google.android.youtube:id/youtube_logo"}
 
 # Feed (home/subscriptions)
 FEED_RESULTS = {"resourceId": "com.google.android.youtube:id/results"}
-VIDEO_IN_FEED = {"descriptionContains": "play video"}  # verified — all feed videos end with "play video"
+VIDEO_IN_FEED = {"descriptionMatches": ".*\\d+ minutes?.*seconds?.*"}  # videos show duration in desc
 VIDEO_THUMBNAIL = {"resourceId": "com.google.android.youtube:id/thumbnail_layout"}
 ACTION_MENU = {"description": "Action menu"}
 
@@ -32,8 +32,8 @@ ACTION_MENU = {"description": "Action menu"}
 MINI_PLAYER = {"description": "Expand Mini Player"}
 
 # Video player (full watch mode — after expanding mini player)
-LIKE_BUTTON = {"descriptionContains": "I like this"}  # verified — NOT "like this video"
-LIKE_BUTTON_ACTIVE = {"descriptionContains": "Remove like"}  # after liking
+LIKE_BUTTON = {"descriptionContains": "like this video"}  # "like this video along with N other people"
+LIKE_BUTTON_ACTIVE = {"descriptionContains": "Remove like"}  # may not appear — YouTube keeps same desc after like
 DISLIKE_BUTTON = {"descriptionContains": "I dislike this"}
 VIDEO_PLAYER = {"description": "Video player"}
 PAUSE_BUTTON = {"description": "Pause video"}
@@ -50,12 +50,17 @@ SHARE_BUTTON = {"descriptionContains": "Share"}
 SUBSCRIBE_BUTTON = {"textContains": "Subscribe"}
 SUBSCRIBED_INDICATOR = {"textContains": "Subscribed"}
 
-# Comment section (need to scroll down below engagement row)
-COMMENT_SECTION = {"textContains": "Comments"}
-COMMENT_INPUT = {"textContains": "Add a comment"}
+# Comment section — click comment preview to open, not scroll to "Comments"
+COMMENT_SECTION = {"textContains": "Comments"}  # fallback
+COMMENT_PREVIEW = {"className": "android.widget.EditText"}  # comment preview area with placeholder
+COMMENT_INPUT = {"className": "android.widget.EditText"}  # same element, click to type
 COMMENT_INPUT_ALT = {"descriptionContains": "Add a comment"}
-COMMENT_SEND_BUTTON = {"descriptionContains": "Send"}
+COMMENT_SEND_BUTTON = {"description": "Send comment"}  # verified — red arrow button
+COMMENT_CLOSE = {"description": "Close"}  # close comment sheet
 COMMENT_SORT = {"descriptionContains": "Sort comments"}
+
+# Close minimized player
+CLOSE_MINI_PLAYER = {"description": "Close minimized player"}
 
 # Login
 SIGN_IN_BUTTON = {"textContains": "Sign in"}

@@ -50,6 +50,7 @@ class YouTubeBot:
         self.scroll_count = self.config.get("scroll_count", 15)
         self.watch_min = self.config.get("watch_min_seconds", 10)
         self.watch_max = self.config.get("watch_max_seconds", 45)
+        self._seen_videos = set()
 
     def _reconnect(self):
         """Reconnect after u2 disconnect (common with YouTube)."""
@@ -173,8 +174,8 @@ class YouTubeBot:
         logger.info(f"Login {'successful' if success else 'failed — check CAPTCHA/2FA'}")
         return success
 
-    def _go_subscriptions(self):
-        """Navigate to Subscriptions tab."""
+    def _go_feed(self):
+        """Navigate to Subscriptions feed — only engage with subscribed channels."""
         self._dismiss_mini_player()
         sub = self.device.find(**sel.NAV_SUBSCRIPTIONS)
         if sub.exists(timeout=3):
@@ -188,14 +189,24 @@ class YouTubeBot:
         random_sleep(watch_time, watch_time + 2.0, modulable=False)
 
     def _open_video_from_feed(self) -> bool:
-        """Click a video from the feed. YouTube opens it as mini player."""
-        vid = self.device.find(**sel.VIDEO_IN_FEED)
-        if vid.exists(timeout=5):
-            self.device.click_element(vid)
+        """Click an unseen video from the feed."""
+        vids = self.device.d(descriptionMatches=r".*\d+ minutes?.*seconds?.*")
+        for v in vids:
+            desc = v.info.get("contentDescription", "")
+            vid_key = desc[:60]
+            if vid_key in self._seen_videos:
+                continue
+            self._seen_videos.add(vid_key)
+            logger.info(f"Opening: {desc[:80]}")
+            v.click()
             random_sleep(3.0, 5.0)
-            # YouTube opens as mini player — expand to full watch
             self._reconnect()
-            return self._expand_mini_player()
+            # Expand mini player if needed (may open fullscreen directly)
+            mini = self.device.find(**sel.MINI_PLAYER)
+            if mini.exists(timeout=3):
+                self.device.click_element(mini)
+                random_sleep(2.0, 4.0)
+            return True
         return False
 
     def _try_like(self, session: SessionState) -> bool:
@@ -205,74 +216,61 @@ class YouTubeBot:
         if not like_btn.exists(timeout=5):
             return False
 
-        # Check if already liked
-        if self.device.exists(**sel.LIKE_BUTTON_ACTIVE):
-            return False
-
+        # YouTube doesn't change description after liking — can't verify via "Remove like"
+        # Just click and count it
         self.device.click_element(like_btn)
         random_sleep(1.0, 2.0)
-
-        # Verify
-        self._reconnect()
-        if self.device.exists(**sel.LIKE_BUTTON_ACTIVE):
-            session.add_like()
-            logger.info("Liked video")
-            return True
-        else:
-            session.add_like()  # count it anyway
-            logger.info("Liked video (unverified)")
-            return True
+        session.add_like()
+        logger.info("Liked video")
+        return True
 
     def _try_comment(self, session: SessionState, comment_text: str) -> bool:
-        """Comment on current video. Must scroll down to find comment section."""
+        """Comment on current video. Click comment preview to open sheet."""
         self._reconnect()
 
-        # Scroll down to find comments
-        w, h = self.device.screen_size
-        for _ in range(3):
-            self.device.swipe_up()
-            random_sleep(1.0, 2.0)
-            self._reconnect()
-            comment_section = self.device.find(**sel.COMMENT_SECTION)
-            if comment_section.exists(timeout=2):
-                break
-        else:
-            logger.debug("Comment section not found after scrolling")
+        # Click comment preview (EditText with placeholder) to open comment sheet
+        comment_preview = self.device.d(className="android.widget.EditText")
+        if not comment_preview.exists(timeout=3):
+            logger.debug("Comment preview not found")
             return False
 
-        # Tap comment section to expand
-        self.device.click_element(comment_section)
+        comment_preview.click()
         random_sleep(2.0, 4.0)
         self._reconnect()
 
-        # Find comment input
-        comment_input = self.device.find(**sel.COMMENT_INPUT)
+        # Now in comment sheet — find input and type
+        comment_input = self.device.d(className="android.widget.EditText")
         if not comment_input.exists(timeout=3):
-            comment_input = self.device.find(**sel.COMMENT_INPUT_ALT)
-            if not comment_input.exists(timeout=3):
-                self.device.press_back()
-                return False
+            logger.debug("Comment input not found in sheet")
+            self.device.press_back()
+            return False
 
-        self.device.click_element(comment_input)
-        random_sleep(1.0, 2.0)
-        self.device.type_text(comment_text)
+        comment_input.click()
+        random_sleep(0.5, 1.0)
+        comment_input.clear_text()
+        random_sleep(0.3, 0.5)
+        self.device.d.send_keys(comment_text)
         random_sleep(0.5, 1.5)
 
-        send_btn = self.device.find(**sel.COMMENT_SEND_BUTTON)
+        # Click "Send comment" button
+        send_btn = self.device.d(description="Send comment")
         if send_btn.exists(timeout=3):
-            self.device.click_element(send_btn)
+            send_btn.click()
             random_sleep(2.0, 3.0)
             session.add_comment()
             logger.info(f"Commented: {comment_text[:30]}...")
         else:
-            # Try keyboard send
             self.device.d.send_action("send")
             random_sleep(1.0, 2.0)
             session.add_comment()
             logger.info(f"Commented (keyboard): {comment_text[:30]}...")
 
-        # Close comment section
-        self.device.press_back()
+        # Close comment sheet
+        close = self.device.d(description="Close")
+        if close.exists(timeout=2):
+            close.click()
+        else:
+            self.device.press_back()
         random_sleep(1.0, 2.0)
         return True
 
@@ -294,7 +292,7 @@ class YouTubeBot:
     def scroll_feed(self, session: SessionState, storage: Storage):
         """Browse Subscriptions feed, engage with videos."""
         logger.info(f"Starting YouTube session — {self.scroll_count} videos planned")
-        self._go_subscriptions()
+        self._go_feed()
 
         comments = storage.load_comments()
 
@@ -330,13 +328,16 @@ class YouTubeBot:
 
             # Go back to feed
             self._reconnect()
-            # Minimize player first
-            mini_btn = self.device.find(**sel.MINIMIZE_BUTTON)
-            if mini_btn.exists(timeout=2):
-                self.device.click_element(mini_btn)
+            self.device.press_back()
+            random_sleep(1.0, 2.0)
+            # Close mini player if it appears
+            self._reconnect()
+            close_btn = self.device.d(description="Close minimized player")
+            if close_btn.exists(timeout=2):
+                close_btn.click()
                 random_sleep(1.0, 2.0)
             self._dismiss_mini_player()
-            self._go_subscriptions()
+            self._go_feed()
 
             session.add_scroll()
             self.device.swipe_up()
