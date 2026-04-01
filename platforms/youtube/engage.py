@@ -415,8 +415,14 @@ class YouTubeBot:
             f"{session.total_likes} likes"
         )
 
-    def run(self, session: SessionState, storage: Storage, credentials: dict) -> bool:
-        """Full YouTube engagement session: Subscriptions feed + Shorts."""
+    def run(self, session: SessionState, storage: Storage, credentials: dict, mode: str = "both") -> bool:
+        """YouTube engagement session.
+
+        Modes:
+            feed   — Subscriptions only (like + comment)
+            shorts — Shorts only (like)
+            both   — Subscriptions then Shorts
+        """
         session.platform = "youtube"
 
         self.open_app()
@@ -429,11 +435,11 @@ class YouTubeBot:
             else:
                 logger.info("No credentials — browsing without login")
 
-        # Phase 1: Subscriptions feed (like + comment)
-        self.scroll_feed(session, storage)
+        if mode in ("feed", "both"):
+            self.scroll_feed(session, storage)
 
-        # Phase 2: Shorts (like only, all channels)
-        self.scroll_shorts(session)
+        if mode in ("shorts", "both"):
+            self.scroll_shorts(session)
 
         session.finish()
         storage.save_session(session.to_dict())

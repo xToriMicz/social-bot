@@ -21,9 +21,19 @@ def load_config(path: str = "config/default.json") -> dict:
         return json.load(f)
 
 
+def parse_mode():
+    """Parse run mode from arguments: --shorts, --feed, or both (default)."""
+    if "--shorts" in sys.argv:
+        return "shorts"
+    if "--feed" in sys.argv:
+        return "feed"
+    return "both"
+
+
 def main():
     setup_logging("INFO")
-    logger.info("Social Bot starting...")
+    mode = parse_mode()
+    logger.info(f"Social Bot starting... (mode: {mode})")
 
     config = load_config()
     delay_cfg = config.get("delay", {})
@@ -68,7 +78,7 @@ def main():
                     credentials = json.load(f)
 
             yt_bot = YouTubeBot(device, config)
-            yt_bot.run(session, storage, credentials)
+            yt_bot.run(session, storage, credentials, mode=mode)
 
         # TikTok
         tt_config = config.get("platforms", {}).get("tiktok", {})
