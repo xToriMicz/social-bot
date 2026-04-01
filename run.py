@@ -10,6 +10,7 @@ from core.session import SessionState
 from core.storage import Storage
 from core.utils import setup_logging, set_speed_multiplier
 from platforms.facebook.engage import FacebookBot
+from platforms.tiktok.engage import TikTokBot
 
 logger = logging.getLogger("social-bot")
 
@@ -58,10 +59,20 @@ def main():
         if yt_config.get("enabled"):
             logger.info("YouTube: not implemented yet")
 
-        # TikTok (placeholder)
+        # TikTok
         tt_config = config.get("platforms", {}).get("tiktok", {})
         if tt_config.get("enabled"):
-            logger.info("TikTok: not implemented yet")
+            session = SessionState(config)
+            storage = Storage("default", "tiktok")
+
+            creds_path = storage.account_dir / "credentials.json"
+            credentials = {}
+            if creds_path.exists():
+                with open(creds_path) as f:
+                    credentials = json.load(f)
+
+            tt_bot = TikTokBot(device, config)
+            tt_bot.run(session, storage, credentials)
 
         # Repeat or exit
         if "--once" in sys.argv:
