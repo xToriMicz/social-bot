@@ -50,12 +50,17 @@ SHARE_BUTTON = {"descriptionContains": "Share"}
 SUBSCRIBE_BUTTON = {"textContains": "Subscribe"}
 SUBSCRIBED_INDICATOR = {"textContains": "Subscribed"}
 
-# Comment section (need to scroll down below engagement row)
-COMMENT_SECTION = {"textContains": "Comments"}
-COMMENT_INPUT = {"textContains": "Add a comment"}
+# Comment section — click comment preview to open, not scroll to "Comments"
+COMMENT_SECTION = {"textContains": "Comments"}  # fallback
+COMMENT_PREVIEW = {"className": "android.widget.EditText"}  # comment preview area with placeholder
+COMMENT_INPUT = {"className": "android.widget.EditText"}  # same element, click to type
 COMMENT_INPUT_ALT = {"descriptionContains": "Add a comment"}
-COMMENT_SEND_BUTTON = {"descriptionContains": "Send"}
+COMMENT_SEND_BUTTON = {"description": "Send comment"}  # verified — red arrow button
+COMMENT_CLOSE = {"description": "Close"}  # close comment sheet
 COMMENT_SORT = {"descriptionContains": "Sort comments"}
+
+# Close minimized player
+CLOSE_MINI_PLAYER = {"description": "Close minimized player"}
 
 # Login
 SIGN_IN_BUTTON = {"textContains": "Sign in"}

@@ -225,55 +225,52 @@ class YouTubeBot:
         return True
 
     def _try_comment(self, session: SessionState, comment_text: str) -> bool:
-        """Comment on current video. Must scroll down to find comment section."""
+        """Comment on current video. Click comment preview to open sheet."""
         self._reconnect()
 
-        # Scroll down to find comments
-        w, h = self.device.screen_size
-        for _ in range(3):
-            self.device.swipe_up()
-            random_sleep(1.0, 2.0)
-            self._reconnect()
-            comment_section = self.device.find(**sel.COMMENT_SECTION)
-            if comment_section.exists(timeout=2):
-                break
-        else:
-            logger.debug("Comment section not found after scrolling")
+        # Click comment preview (EditText with placeholder) to open comment sheet
+        comment_preview = self.device.d(className="android.widget.EditText")
+        if not comment_preview.exists(timeout=3):
+            logger.debug("Comment preview not found")
             return False
 
-        # Tap comment section to expand
-        self.device.click_element(comment_section)
+        comment_preview.click()
         random_sleep(2.0, 4.0)
         self._reconnect()
 
-        # Find comment input
-        comment_input = self.device.find(**sel.COMMENT_INPUT)
+        # Now in comment sheet — find input and type
+        comment_input = self.device.d(className="android.widget.EditText")
         if not comment_input.exists(timeout=3):
-            comment_input = self.device.find(**sel.COMMENT_INPUT_ALT)
-            if not comment_input.exists(timeout=3):
-                self.device.press_back()
-                return False
+            logger.debug("Comment input not found in sheet")
+            self.device.press_back()
+            return False
 
-        self.device.click_element(comment_input)
-        random_sleep(1.0, 2.0)
-        self.device.type_text(comment_text)
+        comment_input.click()
+        random_sleep(0.5, 1.0)
+        comment_input.clear_text()
+        random_sleep(0.3, 0.5)
+        self.device.d.send_keys(comment_text)
         random_sleep(0.5, 1.5)
 
-        send_btn = self.device.find(**sel.COMMENT_SEND_BUTTON)
+        # Click "Send comment" button
+        send_btn = self.device.d(description="Send comment")
         if send_btn.exists(timeout=3):
-            self.device.click_element(send_btn)
+            send_btn.click()
             random_sleep(2.0, 3.0)
             session.add_comment()
             logger.info(f"Commented: {comment_text[:30]}...")
         else:
-            # Try keyboard send
             self.device.d.send_action("send")
             random_sleep(1.0, 2.0)
             session.add_comment()
             logger.info(f"Commented (keyboard): {comment_text[:30]}...")
 
-        # Close comment section
-        self.device.press_back()
+        # Close comment sheet
+        close = self.device.d(description="Close")
+        if close.exists(timeout=2):
+            close.click()
+        else:
+            self.device.press_back()
         random_sleep(1.0, 2.0)
         return True
 
