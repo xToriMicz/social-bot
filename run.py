@@ -11,6 +11,7 @@ from core.storage import Storage
 from core.utils import setup_logging, set_speed_multiplier
 from platforms.facebook.engage import FacebookBot
 from platforms.tiktok.engage import TikTokBot
+from platforms.youtube.engage import YouTubeBot
 
 logger = logging.getLogger("social-bot")
 
@@ -54,10 +55,20 @@ def main():
             fb_bot = FacebookBot(device, config)
             fb_bot.run(session, storage, credentials)
 
-        # YouTube (placeholder)
+        # YouTube
         yt_config = config.get("platforms", {}).get("youtube", {})
         if yt_config.get("enabled"):
-            logger.info("YouTube: not implemented yet")
+            session = SessionState(config)
+            storage = Storage("default", "youtube")
+
+            creds_path = storage.account_dir / "credentials.json"
+            credentials = {}
+            if creds_path.exists():
+                with open(creds_path) as f:
+                    credentials = json.load(f)
+
+            yt_bot = YouTubeBot(device, config)
+            yt_bot.run(session, storage, credentials)
 
         # TikTok
         tt_config = config.get("platforms", {}).get("tiktok", {})
