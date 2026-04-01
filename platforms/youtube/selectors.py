@@ -24,7 +24,7 @@ YOUTUBE_LOGO = {"resourceId": "com.google.android.youtube:id/youtube_logo"}
 
 # Feed (home/subscriptions)
 FEED_RESULTS = {"resourceId": "com.google.android.youtube:id/results"}
-VIDEO_IN_FEED = {"descriptionContains": "play video"}  # verified — all feed videos end with "play video"
+VIDEO_IN_FEED = {"descriptionMatches": ".*\\d+ minutes?.*seconds?.*"}  # videos show duration in desc
 VIDEO_THUMBNAIL = {"resourceId": "com.google.android.youtube:id/thumbnail_layout"}
 ACTION_MENU = {"description": "Action menu"}
 
@@ -32,8 +32,8 @@ ACTION_MENU = {"description": "Action menu"}
 MINI_PLAYER = {"description": "Expand Mini Player"}
 
 # Video player (full watch mode — after expanding mini player)
-LIKE_BUTTON = {"descriptionContains": "I like this"}  # verified — NOT "like this video"
-LIKE_BUTTON_ACTIVE = {"descriptionContains": "Remove like"}  # after liking
+LIKE_BUTTON = {"descriptionContains": "like this video"}  # "like this video along with N other people"
+LIKE_BUTTON_ACTIVE = {"descriptionContains": "Remove like"}  # may not appear — YouTube keeps same desc after like
 DISLIKE_BUTTON = {"descriptionContains": "I dislike this"}
 VIDEO_PLAYER = {"description": "Video player"}
 PAUSE_BUTTON = {"description": "Pause video"}
