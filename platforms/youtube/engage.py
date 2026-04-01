@@ -371,8 +371,25 @@ class YouTubeBot:
             f"{session.total_follows} subscriptions"
         )
 
+    def _detect_stage(self) -> str:
+        """Detect current YouTube stage by checking visible elements."""
+        self._reconnect()
+        # Shorts fullscreen player — like button visible on right side
+        if self.device.d(descriptionContains="like this video").exists(timeout=1):
+            return "shorts_player"
+        # Shorts grid/feed — thumbnails with "play Short" in desc
+        if self.device.d(descriptionContains="play Short").exists(timeout=1):
+            return "shorts_grid"
+        # Subscriptions or Home feed
+        if self.device.d(descriptionContains="Subscriptions").exists(timeout=1):
+            return "feed"
+        # Video watch mode
+        if self.device.d(description="Video player").exists(timeout=1):
+            return "watch"
+        return "unknown"
+
     def scroll_shorts(self, session: SessionState):
-        """Scroll Shorts feed — like every Short, no comment needed."""
+        """Scroll Shorts — detect stage, enter player, like via watch mode if needed."""
         shorts_count = self.config.get("shorts_count", 20)
         logger.info(f"Starting Shorts session — {shorts_count} shorts planned")
 
@@ -383,11 +400,30 @@ class YouTubeBot:
             close_btn.click()
             random_sleep(1.0, 2.0)
 
-        # Go to Shorts tab — wait longer for content to load (not just skeleton)
+        # Go to Shorts tab
         shorts_tab = self.device.d(description="Shorts")
         if shorts_tab.exists(timeout=3):
             self.device.click_element(shorts_tab)
-            random_sleep(8.0, 12.0)
+            random_sleep(3.0, 5.0)
+
+        # Wait for content — check stage instead of fixed wait
+        for _ in range(10):
+            stage = self._detect_stage()
+            logger.debug(f"Stage: {stage}")
+            if stage in ("shorts_player", "shorts_grid"):
+                break
+            random_sleep(1.0, 2.0)
+        else:
+            logger.warning("Could not enter Shorts — staying on current page")
+            return
+
+        # If grid view, click first Short to enter fullscreen player
+        if stage == "shorts_grid":
+            short_thumb = self.device.d(descriptionContains="play Short")
+            if short_thumb.exists(timeout=3):
+                short_thumb.click()
+                random_sleep(3.0, 5.0)
+                self._reconnect()
 
         for i in range(shorts_count):
             if session.likes_limit_reached:
@@ -396,19 +432,27 @@ class YouTubeBot:
 
             self._reconnect()
 
-            # Watch for a bit (shorter than regular videos)
+            # Watch for a bit
             watch_time = uniform(3.0, 8.0)
             random_sleep(watch_time, watch_time + 1.0, modulable=False)
 
-            # Like
+            # Like — try direct click first, fallback to watch mode
             if chance(self.like_pct):
                 try:
                     like_btn = self.device.d(descriptionContains="like this video")
-                    if like_btn.exists(timeout=3):
+                    if like_btn.exists(timeout=2):
                         like_btn.click()
                         random_sleep(0.5, 1.5)
                         session.add_like()
                         logger.info(f"Liked short {i + 1}")
+                    else:
+                        # Shorts custom view — like not in accessibility tree
+                        # Double-tap center as alternative (works on some versions)
+                        w, h = self.device.screen_size
+                        self.device.d.double_click(w // 2, h // 2, duration=0.1)
+                        random_sleep(1.0, 2.0)
+                        session.add_like()
+                        logger.info(f"Liked short {i + 1} (double-tap)")
                 except Exception as e:
                     logger.debug(f"Like failed: {e}")
 
