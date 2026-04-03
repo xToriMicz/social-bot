@@ -38,7 +38,7 @@
       "shorts_count": 20
     },
     "tiktok": {
-      "enabled": false,
+      "enabled": true,
       "like_percentage": 80,
       "comment_percentage": 10,
       "follow_percentage": 15,
