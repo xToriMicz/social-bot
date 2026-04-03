@@ -79,9 +79,62 @@ class TikTokBot:
             logger.info("u2 disconnected — reconnecting")
             self.device = _reconnect_device(self.serial)
 
+    def _is_in_tiktok(self) -> bool:
+        """Check if we're still inside TikTok app (not Chrome/browser)."""
+        try:
+            current = self.device.d.app_current()
+            return current.get("package") == sel.PACKAGE
+        except Exception:
+            return False
+
+    def _recover_to_tiktok(self) -> bool:
+        """If we left TikTok (e.g. browser opened), go back."""
+        if self._is_in_tiktok():
+            return True
+        logger.warning("Left TikTok app — recovering")
+        # Press back repeatedly to close browser/popup
+        for _ in range(5):
+            self.device.press_back()
+            random_sleep(0.5, 1.0)
+            if self._is_in_tiktok():
+                logger.info("Recovered to TikTok")
+                self._dismiss_login_popup()
+                return True
+        # If back doesn't work, force reopen TikTok
+        logger.warning("Back didn't work — reopening TikTok")
+        subprocess.run(
+            ["adb", "-s", self.serial, "shell", "am", "start",
+             "-n", f"{sel.PACKAGE}/com.ss.android.ugc.aweme.splash.SplashActivity"],
+            capture_output=True,
+        )
+        random_sleep(3.0, 5.0)
+        self._dismiss_login_popup()
+        return self._is_in_tiktok()
+
+    def _dismiss_login_popup(self):
+        """Dismiss 'Log in to TikTok' popup by tapping X (close), NOT Continue."""
+        # The login popup has an X button at top-right
+        close_btn = self.device.d(description="Close")
+        if close_btn.exists(timeout=2):
+            self.device.click_element(close_btn)
+            random_sleep(1.0, 2.0)
+            logger.info("Dismissed login popup via Close button")
+            return
+        # Fallback: press back
+        if self.device.d(textContains="Log in to TikTok").exists(timeout=1):
+            self.device.press_back()
+            random_sleep(1.0, 2.0)
+            logger.info("Dismissed login popup via back")
+
     def _detect_stage(self) -> str:
         """Detect current TikTok stage by checking visible elements."""
         self._reconnect()
+        # First check if we're even in TikTok
+        if not self._is_in_tiktok():
+            return "outside_app"
+        # Login popup — must dismiss before anything else
+        if self.device.d(textContains="Log in to TikTok").exists(timeout=1):
+            return "login_popup"
         # Video feed — like button visible on right side
         if self.device.d(descriptionContains="Like video").exists(timeout=1):
             return "feed_player"
@@ -283,6 +336,19 @@ class TikTokBot:
     def _try_like(self, session: SessionState) -> bool:
         """Like current video via double-tap on screen center."""
         self._reconnect()
+        # Must be in TikTok feed to like
+        if not self._is_in_tiktok():
+            self._recover_to_tiktok()
+            return False
+        # Dismiss login popup if present
+        stage = self._detect_stage()
+        if stage == "login_popup":
+            self._dismiss_login_popup()
+            return False
+        if stage == "outside_app":
+            self._recover_to_tiktok()
+            return False
+
         # Check if already liked
         if self.device.exists(**sel.UNLIKE_BUTTON):
             return False
@@ -294,6 +360,12 @@ class TikTokBot:
         self.device.d.double_click(cx, cy, duration=0.1)
         random_sleep(0.8, 1.5)
 
+        # Verify we didn't trigger login popup
+        if self.device.d(textContains="Log in to TikTok").exists(timeout=1):
+            logger.warning("Like triggered login popup — dismissing")
+            self._dismiss_login_popup()
+            return False
+
         self._checkpoint("like", "double_tap")
         session.add_like()
         return True
@@ -301,6 +373,10 @@ class TikTokBot:
     def _try_like_button(self, session: SessionState) -> bool:
         """Like via the heart icon button (fallback method)."""
         self._reconnect()
+        if not self._is_in_tiktok():
+            self._recover_to_tiktok()
+            return False
+
         if self.device.exists(**sel.UNLIKE_BUTTON):
             return False
 
@@ -312,6 +388,13 @@ class TikTokBot:
 
         self.device.click_element(like_btn)
         random_sleep(0.5, 1.2)
+
+        # Verify we didn't trigger login popup
+        if self.device.d(textContains="Log in to TikTok").exists(timeout=1):
+            logger.warning("Like button triggered login popup — dismissing")
+            self._dismiss_login_popup()
+            return False
+
         self._checkpoint("like", "button")
         session.add_like()
         return True
@@ -422,6 +505,17 @@ class TikTokBot:
                 break
 
             self._reconnect()
+
+            # Stage check — recover if not in feed
+            stage = self._detect_stage()
+            if stage == "outside_app":
+                if not self._recover_to_tiktok():
+                    logger.error("Cannot recover to TikTok — stopping")
+                    break
+                continue
+            if stage == "login_popup":
+                self._dismiss_login_popup()
+                continue
 
             # Watch the video
             self._watch_video()
